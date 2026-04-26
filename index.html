@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProZBill</title>
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, sans-serif; }
+        body { background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .card { background: white; border-radius: 16px; padding: 30px 20px; width: 100%; max-width: 360px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { text-align: center; margin: 0 0 5px; font-size: 28px; color: #1a73e8; }
+        h2 { text-align: center; margin: 0 0 25px; font-weight: 500; color: #333; }
+        .btn { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #dadce0; border-radius: 8px; background: white; cursor: pointer; font-size: 15px; display: flex; align-items: center; gap: 10px; transition: background 0.2s; }
+        .btn:hover { background: #f8f9fa; }
+        .svg-icon { width: 20px; height: 20px; }
+        .divider { display: flex; align-items: center; margin: 16px 0; color: #777; }
+        .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid #dadce0; }
+        .divider span { margin: 0 12px; font-size: 14px; }
+        .input-field { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #dadce0; border-radius: 8px; display: none; }
+        .primary-btn { width: 100%; padding: 12px; margin: 8px 0; background: #1a73e8; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; display: none; }
+        .link { text-align: center; margin-top: 16px; font-size: 14px; color: #1a73e8; cursor: pointer; }
+        .error { color: #d93025; font-size: 13px; margin-top: 4px; display: none; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+<div class="card" id="authCard">
+    <h1>ProZBill</h1>
+    <h2 id="authTitle">Log In</h2>
+
+    <button class="btn" onclick="handleGoogle()">
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="G" class="svg-icon"> 
+        <span id="googleText">Log in with Google</span>
+    </button>
+
+    <button class="btn" onclick="showEmailMethod()">
+        <svg class="svg-icon" viewBox="0 0 24 24" fill="#666"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        <span id="emailMethodText">Log in with Email</span>
+    </button>
+
+    <div class="divider"><span>or</span></div>
+
+    <button class="btn" onclick="showPhoneMethod()">
+        <svg class="svg-icon" viewBox="0 0 24 24" fill="#666"><path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.58.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.58 1 1 0 01-.25 1.01l-2.2 2.2z"/></svg>
+        <span id="phoneMethodText">Phone number</span>
+    </button>
+
+    <input class="input-field" id="email" type="email" placeholder="Email">
+    <input class="input-field" id="password" type="password" placeholder="Parolă">
+    <button class="primary-btn" id="emailSubmitBtn" onclick="handleEmailSubmit()">Sign in</button>
+
+    <input class="input-field" id="phone" type="tel" placeholder="+407xxxxxxxx">
+    <input class="input-field" id="code" type="text" placeholder="Cod SMS">
+    <button class="primary-btn" id="sendCodeBtn" onclick="sendCode()">Trimite cod SMS</button>
+    <button class="primary-btn" id="verifyBtn" onclick="verifyCode()">Verifică codul</button>
+
+    <p class="error" id="error"></p>
+
+    <div class="link" id="switchLink" onclick="toggleMode()">
+        No account yet? <u>Sign up</u>
+    </div>
+</div>
+
+<div id="app" style="display:none; text-align:center;">
+    <p>Bine ai venit, <span id="userEmail"></span>!</p>
+    <button onclick="logout()" style="margin-top:10px; padding:10px 20px;">Logout</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script>
+    // ⚠️ Înlocuiește cu config-ul tău real din Firebase
+    const firebaseConfig = {
+  apiKey: "AIzaSyD8j_oEZ4Kqjb7L8OlrfaNTn3MqBUFTvaA",
+  authDomain: "prozbill-fefbd.firebaseapp.com",
+  projectId: "prozbill-fefbd",
+  storageBucket: "prozbill-fefbd.firebasestorage.app",
+  messagingSenderId: "910724103763",
+  appId: "1:910724103763:web:e84692426a35d914d050a6"
+};
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    window.confirmationResult = null;
+    window.recaptchaVerifier = null;
+
+    let isSignUp = false;
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('authCard').classList.add('hidden');
+            document.getElementById('app').style.display = 'block';
+            document.getElementById('userEmail').textContent = user.email || user.phoneNumber || 'Utilizator';
+        } else {
+            document.getElementById('authCard').classList.remove('hidden');
+            document.getElementById('app').style.display = 'none';
+            resetUI();
+        }
+    });
+
+    function resetUI() {
+        document.querySelectorAll('.input-field, .primary-btn').forEach(el => el.style.display = 'none');
+        document.getElementById('error').style.display = 'none';
+        updateModeUI();
+    }
+
+    function updateModeUI() {
+        const title = document.getElementById('authTitle');
+        const googleText = document.getElementById('googleText');
+        const emailMethodText = document.getElementById('emailMethodText');
+        const phoneMethodText = document.getElementById('phoneMethodText');
+        const switchLink = document.getElementById('switchLink');
+        const emailSubmitBtn = document.getElementById('emailSubmitBtn');
+
+        if (isSignUp) {
+            title.textContent = 'Sign Up';
+            googleText.textContent = 'Sign up with Google';
+            emailMethodText.textContent = 'Sign up with Email';
+            phoneMethodText.textContent = 'Sign up with Phone';
+            switchLink.innerHTML = 'Already have an account? <u>Log in</u>';
+            emailSubmitBtn.textContent = 'Sign up';
+        } else {
+            title.textContent = 'Log In';
+            googleText.textContent = 'Log in with Google';
+            emailMethodText.textContent = 'Log in with Email';
+            phoneMethodText.textContent = 'Phone number';
+            switchLink.innerHTML = 'No account yet? <u>Sign up</u>';
